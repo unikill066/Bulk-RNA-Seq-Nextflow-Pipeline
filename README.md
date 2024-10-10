@@ -8,7 +8,7 @@ This is an automated workflow pipeline for analyzing and processing Bulk-RNA seq
 4. Transcript Assembly and Quantification - Generate counts using StringTie
 5. [Completed] Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts
 
-![Bulk-RNA Seq NextFlow Pipeline](misc/Bulk-RNA-Seq_Pipeline.PNG)
+![Bulk-RNA Seq NextFlow Pipeline](misc/Bulk-RNA-Seq Pipeline.PNG)
 
 
 Running the Bulk-RNA-Sequencing-Nextflow-Pipeline is pretty straight forward, however a good understanding of `bash` is recommended.
@@ -124,3 +124,13 @@ The output files are stored in the config directory or on the volume mount filep
 | 3. Mapping and Map Metrics       | Alignment of reads and generation of mapping statistics | ![Output](misc/3_STAR.PNG) <br> ![Output](misc/3_MAP_MET.PNG)                                                              |
 | 4. Filtering and Quality Metrics | Post-alignment filtering and quality assessment         | ![Output](misc/4_filt.PNG) <br> ![Output](misc/4_quali.PNG)                                                                |
 | 5. StringTie and Raw Counts      | Counts using StringTie and FeatureCounts/HTSeq          | ![Output](misc/5_string_tie.PNG) <br> ![Output](misc/5_raw_counts_htseq.PNG) <br> ![Output](misc/5_raw_counts_feature.PNG) |
+
+
+
+### Credits and Acknowledgments
+This Bulk-RNA Seq Data Processing Pipeline was developed with contributions from the following team members:
+
+- **Authors**:
+  - Dr. Tavares Ferreira, Diana
+  - Dr. Mazhar, Khadijah
+  - [Inturi, Nikhil Nageshwar](https://github.com/unikill066) - inturinikhilnageshwar@gmail.com
