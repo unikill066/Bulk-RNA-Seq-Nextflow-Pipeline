@@ -6,7 +6,7 @@ This is an automated workflow pipeline for analyzing and processing Bulk-RNA seq
 3. RPost-Alignment Processing - Filter, deduplicate, and index aligned reads
 3_1. Quality Assessment - Generate Qualimap reports for aligned reads
 4. Transcript Assembly and Quantification - Generate counts using StringTie
-5. [Completed] Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts
+5. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts
 
 ![Bulk-RNA Seq NextFlow Pipeline](misc/Bulk-RNA-Seq Pipeline.PNG)
 
