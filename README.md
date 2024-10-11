@@ -8,8 +8,7 @@ This is an automated workflow pipeline for analyzing and processing Bulk-RNA seq
 4. Transcript Assembly and Quantification - Generate counts using StringTie
 5. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts
 
-![Bulk-RNA Seq NextFlow_Pipeline](misc/Bulk-RNA-Seq_Pipeline.PNG)
-
+[![Bulk RNA Sequencing Nextflow Pipeline](misc/Bulk-RNA-Seq_Pipeline.PNG)](misc/bulk-pipe.pptx)
 
 Running the Bulk-RNA-Sequencing-Nextflow-Pipeline is pretty straight forward, however a good understanding of `bash` is recommended.
 
