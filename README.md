@@ -1,121 +1,135 @@
-# Analysis Pipeline for Visium 10x Data [visium10x-spatial-transcriptomics-pipeline]
-This repository provides an R-based pipeline for analyzing spatial RNA-seq data using ***Seurat***, 
-***STDeconvolve***, and ***Giotto***. Designed to process and analyze spatial transcriptomics data 
-through a sequence of well-defined steps, enabling in-depth exploration and interpretation 
-of spatially resolved gene expression profiles.
+# Bulk-RNA Seq Data Processing Pipeline using NextFlow / Docker
+This is an automated workflow pipeline for analyzing and processing Bulk-RNA seq data, implemented primarily in bash, python and R, and wrapped in a NextFlow workflow to characterize the gene landscape in the samples. Here are the steps for data processing:
+1. Quality Control - Generate FastQC and MultiQC reports
+2. Genome Alignment - Map reads to the reference genome using STAR
+2_1. Mapping Metrics - Generate mapping statistics and quality reports
+3. RPost-Alignment Processing - Filter, deduplicate, and index aligned reads
+3_1. Quality Assessment - Generate Qualimap reports for aligned reads
+4. Transcript Assembly and Quantification - Generate counts using StringTie
+5. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts
 
-> Note: Make sure to have older version of Giotto (1.1.2).
+[![Bulk RNA Sequencing Nextflow Pipeline](misc/Bulk-RNA-Seq_Pipeline.PNG)](misc/bulk-pipe.pptx)
 
-### Tools used:
+Running the Bulk-RNA-Sequencing-Nextflow-Pipeline is pretty straight forward, however a good understanding of `bash` is recommended.
 
-| Tool         | Functions                                                    |
-|--------------|--------------------------------------------------------------|
-| [Seurat](https://satijalab.org/seurat/articles/spatial_vignette)       | `automated_seurat_analysis_func`, `automated_seurat_spatial_analysis_func` |
-| [STDeconvolve](https://jef.works/STdeconvolve/) | `decolvolve_spatial_transcriptomics_analysis`               |
-| [Giotto](https://rubd.github.io/Giotto_site/)       | `giotto_spatial_transcriptomics_analysis`                   |
+There are two ways to run the Bulk-RNA Seq pipeline: either by installing the necessary packages manually on the system, or by using a **Docker** container, where everything is pre-packaged. If you choose to use Docker, skip to the next section **Running the Tool in Docker**.
 
-### Files:
-
-| File Name                       | Description                                     |
-|---------------------------------|-------------------------------------------------|
-| `run_analysis.R`                | Main script to run the entire analysis pipeline. |
-| `package_installer.R`            | Script to install necessary R packages.         |
-| `seurat_analysis.R`             | Functions for Seurat-based analysis.            |
-| `cell_deconvolution_analysis.R` | Functions for cell deconvolution analysis.      |
-| `giotto_gene_expr_analysis.R`   | Functions for Giotto-based analysis.            |
-
-### Installation:
-```commandline
-git clone https://github.com/utdal/visium10x-spatial-transcriptomics-pipeline.git
-cd visium10x-spatial-transcriptomics-pipeline
+## Installation/Setup of Bulk-RNA Seq NextFlow Pipeline:
+You can install Bulk-RNA Seq NextFlow Pipeline via git:
+```
+git clone https://github.com/utdal/Bulk-RNA-Seq-Nextflow-Pipeline.git
 ```
 
-### How to run the pipeline:
-Note: Prior to running the pipeline, one needs to install R and RStudio/VSCode for running the R-based pipeline.
+To execute the tool, essential modifications need to be made to the file(s):
+```
+a) pipeline.config
+b) rna_seq_samples.txt
+```
 
-1. Open `run_analysis.R` in Rstudio/VSCode.
-2. Modify the directory paths, per sample.
-3. Additionally, for Giotto analysis, there is a chance that the barcodes may not overlap with the tissue, in that case; `xmax_adj`, `xmin_adj`, `ymax_adj` and `ymin_adj` need to be adjusted accordingly.
-4. Outputs generated are saved to the directory path defined in `run_analysis.R` file.
+> Note:
+> 1. Install [nextflow](https://www.nextflow.io/docs/latest/install.html), [conda](https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh), [R](https://cran.r-project.org/) & [Rsubread-featureCounts](https://bioconductor.org/packages/release/bioc/html/Rsubread.html), [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/INSTALL.txt), [MultiQC](https://multiqc.info/docs/getting_started/installation/), [STAR](https://github.com/alexdobin/STAR), [HTSeq](https://anaconda.org/bioconda/htseq), [stringtie](https://ccb.jhu.edu/software/stringtie/), [samtools](https://gist.github.com/hisplan/541af29bb667066430e799ab8cde02d0), [sambamba](https://lomereiter.github.io/sambamba/), [bedtools](https://bedtools.readthedocs.io/en/latest/content/installation.html) and [qualimap](http://qualimap.conesalab.org/doc_html/intro.html) packages.
+> 2. Or simply use the docker container instead from docker-hub: `docker pull`
+> 
+> Download the reference genome: `hg38canon.fa` and, to build the index, execute: `bowtie2-build hg38canon.fa /path/to/reference_genome/index/hg38`
 
-### Output
-The script will generate various output files which include:
+#### Running the Tool:
+Here is an example of how to run the pipeline:
+1. Edit all the parameters, except for the clipping parameters in `pipeline.config` file:
+   ![Output](misc/pipe_conf.PNG)
 
-1. Plots (e.g., UMAP, PCA, heatmaps)
-2. CSV files with marker genes
-3. RDS files with processed data
+   > Note: Clipping parameters can only be updated once **Step-2** is run from the **FastQC** Reports.
 
-##### Plots generated:
-![NaN](misc/plots.PNG)
+2. Command to run the Quality Control steps in Bulk-RNA Seq analysis:
+   ```
+   nextflow run bulk_rna_seq_nextflow_pipeline.nf -c pipeline.config --run_fastqc true --run_rna_pipeline false
+   ```
+3. Update the `pipeline.config` file and run the rest of the pipeline:
+   ```
+   nextflow run bulk_rna_seq_nextflow_pipeline.nf -c pipeline.config --run_fastqc false --run_rna_pipeline true
+   ```
+4. Command to re-run the steps if a fail-point occurs:
+   ```
+   nextflow run bulk_rna_seq_nextflow_pipeline.nf -c pipeline.config --run_fastqc true --run_rna_pipeline false -resume
+   ```
+   or
+   ```
+   nextflow run bulk_rna_seq_nextflow_pipeline.nf -c pipeline.config --run_fastqc false --run_rna_pipeline true -resume
+   ```
+   respectively ...
 
-##### Plots preview:
-<table>
-  <tr>
-    <td><img src="misc/stdeconv_1.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/stdeconv_2.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/stdeconv_top_genes_by_celltype.PNG" alt="Plot" width="250"/></td>
-  </tr>
-  <tr>
-    <td><img src="misc/seurat_feature_counts_plot.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/seurat_feature_scatter.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/seurat_findvar_plot.PNG" alt="Plot" width="250"/></td>
-  </tr>
-  <tr>
-    <td><img src="misc/seurat_heatmap.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/seurat_spatialdimplot_bycluster.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/seurat_elbow_plot.PNG" alt="Plot" width="250"/></td>
-  </tr>
-<tr>
-    <td><img src="misc/seurat_UMAP_clustering.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/seurat_UMAP_clustering2.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/seurat_vln_spatialfeatureplot.PNG" alt="Plot" width="250"/></td>
-  </tr>
-  <tr>
-    <td><img src="misc/16_Giotto_adjusted_spatial_locations.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/17_Giotto_HVGplot.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/17_Giotto_screeplot.PNG" alt="Plot" width="250"/></td>
-  </tr>
-  <tr>
-    <td><img src="misc/19_Giotto_covis_leiden.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/19_Giotto_covis_leiden_voronoi.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/19_Giotto_num_genes.PNG" alt="Plot" width="250"/></td>
-  </tr>
-<tr>
-    <td><img src="misc/19_Giotto_UMAP_leiden.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/21_Giotto_gini_umap.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/21_Giotto_metaheatmap_gini.PNG" alt="Plot" width="250"/></td>
-  </tr>
-  <tr>
-    <td><img src="misc/22_Giotto_metadata_heatmap.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/22_Giotto_scran_umap.PNG" alt="Plot" width="250"/></td>
-    <td><img src="misc/22_Giotto_violinplot_scran.PNG" alt="Plot" width="250"/></td>
-  </tr>
-</table>
+The results generated are stored in the `params.config_directory = '/path/to/config'` directory, as mentioned in the `pipeline.config` file, as shown below:
+![Output](misc/0_outs.PNG)
 
-### Troubleshooting
-1. Missing Files: Ensure all required files are present in the specified paths.
-2. Package Issues: Install any missing R packages using package_installer.R.
-3. Path Errors: Double-check file paths and directory names in the run_analysis.R script.
+#### Running the Tool in Docker:
+Running Bulk-RNA Seq in Docker is straightforward, here is an example of how to run the Bulk-RNA Seq pipeline using Docker.
+1. Check if docker is already installed:
+   ```
+   docker --version
+   ```
+   Below are the required input and configuration files needed to run the tool:
+   - pipeline.config
+   - rna_seq_samples.txt
+   
+   The below files are user defined:
+    - gencode.v38.primary_assembly.annotation.gtf
+    - filter.bed
+    - blacklist.bed
+    - STAR_index
+    - fastq_files
 
-> [Known Issues](https://github.com/utdal/visium10x-spatial-transcriptomics-pipeline/issues/1): `STDeconvolve` and `Giotto` need the input files to be in the following format:
-> ```
-> -- sample
->    -- outs
->      -- filtered_feature_bc_matrix
->         -- barcodes.tsv.gz
->         -- features.tsv.gz
->         -- matrix.mtx.gz
->      -- raw_feature_bc_matrix
->         -- barcodes.tsv.gz
->         -- features.tsv.gz
->         -- matrix.mtx.gz
->      -- spatial
->         -- tissue_positions_list.csv
->         -- scalefactors_json.json
->      -- filtered_feature_bc_matrix.h5
->      -- raw_feature_bc_matrix.h5
->      -- etc.
->```
+2. Place all the necessary files in the `config directory/data`, i.e., `/mnt/Working/BulkRNA-NextFlow-Pipeline/data` using docker volume
+   > Note: The config directory in the docker image would be: `/mnt/Working/BulkRNA-NextFlow-Pipeline` and all the data that would be added via a docker volume mount would be accessible from the `data` directory (`/mnt/Working/BulkRNA-NextFlow-Pipeline/data`). Modify the `pipeline.config` file accordingly.
+   1. Paired-end fastq files in a `fastq_files` directory.
+   2. Bowtie2 genome index files in a directory (e.g., hg38`).
+   3. Reference genome from NCBI in the `refdata-gex-GRCh38-2020-A` directory.
+   4. `rna_seq_samples.txt` containing sample names without paired-end information.
+   5. `pipeline.config` file containing paths to all the necessary files and the genome reference.
+
+3. Run the docker image by setting up a working directory and mounting a volume where the input and configuration files are located.
+   ```
+   docker run -it -v /path/to/mount:/mnt/Working/Bulk_RNA_Seq_NextFlow_Pipeline/data -w /mnt/Working/Bulk_RNA_Seq_NextFlow_Pipeline utdpaincenter/bulk_rna_sequencing_nextflow_pipeline:latest /bin/bash
+   ```
+   > After entering the container; follow the following commands:
+   > 1. Activate the working environment:
+   >    ```
+   >    conda activate bulk_rna_seq
+   >    ```
+   > 2. Run the nextflow pipeline:
+   >    ```
+   >    nextflow run bulk_rna_seq_nextflow_pipeline.nf -c data/pipeline.config --run_fastqc true --run_rna_pipeline false
+   >    ```
+   >    Modify pipeline.config file with the clipping parameters after the FastQC step and run the rest of the pipeline:
+   >    ```
+   >    nextflow run bulk_rna_seq_nextflow_pipeline.nf -c data/pipeline.config --run_fastqc false --run_rna_pipeline true
+   >    ```
+   > 3. If the pipeline encounters errors, dont worry—fix the issues and resume the process from the last checkpoint with:
+   >    ```
+   >    nextflow run bulk_rna_seq_nextflow_pipeline.nf -c data/pipeline.config --run_fastqc false --run_rna_pipeline true -resume
+   >    ```
+   
+4. Once the run is completed, all output files will be copied back to the mounted volume to a `/outs` directory here: `/path/to/mount`
 
 
-Contant: For questions or issues, please reach out [Dr. Tavares Ferreira, Diana](diana.tavaresferreira@utdallas.edu) or [Nikhil Nageshwar Inturi](inturinikhilnageshwar.com). 
+#### Output:
+The output files are stored in the config directory or on the volume mount filepath based on how the pipeline is run; locally or using docker rrespectively. The output should contain the following files and folders:
+![Output](misc/0_outs.PNG)
+
+# Pipeline Stages
+
+| Step                             | Description                                             | Screenshot                                                                                                                 |
+|----------------------------------|---------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| 1. Logs                          | This step involves the collection of logs               | ![Output](misc/1_logs.PNG)                                                                                                 |
+| 2. FastQC and MultiQC            | Quality check using FastQC and report using MultiQC     | ![Output](misc/2_fastqc.PNG) <br> ![Output](misc/2_multiqc.PNG)                                                            |
+| 3. Mapping and Map Metrics       | Alignment of reads and generation of mapping statistics | ![Output](misc/3_STAR.PNG) <br> ![Output](misc/3_MAP_MET.PNG)                                                              |
+| 4. Filtering and Quality Metrics | Post-alignment filtering and quality assessment         | ![Output](misc/4_filt.PNG) <br> ![Output](misc/4_quali.PNG)                                                                |
+| 5. StringTie and Raw Counts      | Counts using StringTie and FeatureCounts/HTSeq          | ![Output](misc/5_string_tie.PNG) <br> ![Output](misc/5_raw_counts_htseq.PNG) <br> ![Output](misc/5_raw_counts_feature.PNG) |
+
+
+
+### Credits and Acknowledgments
+This Bulk-RNA Seq Data Processing Pipeline was developed with contributions from the following team members:
+
+- **Authors**:
+  - Dr. Tavares Ferreira, Diana
+  - Dr. Mazhar, Khadijah
+  - [Inturi, Nikhil Nageshwar](https://github.com/unikill066) - inturinikhilnageshwar@gmail.com
