@@ -309,6 +309,7 @@ process generate_feature_counts {
 
     input:
     val config_directory
+    val num_threads
     val reference_gtf
     val is_paired_end
     val filtered_files
@@ -340,8 +341,8 @@ process generate_feature_counts {
     echo "  Paired-end: ${is_paired_end}" | tee -a ${config_directory}/0_nextflow_logs/feature_counts.log
     echo "  Filtered files directory: ${config_directory}/temp_feature_counts_dir" | tee -a ${config_directory}/0_nextflow_logs/feature_counts.log
 
-    echo 'Rscript ${config_directory}/rsubread_featurecount_script.R "${config_directory}/temp_feature_counts_dir" $reference_gtf $is_paired_end "${config_directory}/5_raw_counts_output/raw_feature_counts.csv"' | tee -a ${config_directory}/0_nextflow_logs/feature_counts.log
-    Rscript ${config_directory}/rsubread_featurecount_script.R "${config_directory}/temp_feature_counts_dir" $reference_gtf $is_paired_end "${config_directory}/5_raw_counts_output/raw_feature_counts.csv" | tee -a ${config_directory}/0_nextflow_logs/feature_counts.log
+    echo 'Rscript ${config_directory}/rsubread_featurecount_script.R "${config_directory}/temp_feature_counts_dir" $reference_gtf $is_paired_end $num_threads "${config_directory}/5_raw_counts_output/raw_feature_counts.csv"' | tee -a ${config_directory}/0_nextflow_logs/feature_counts.log
+    Rscript ${config_directory}/rsubread_featurecount_script.R "${config_directory}/temp_feature_counts_dir" $reference_gtf $is_paired_end $num_threads "${config_directory}/5_raw_counts_output/raw_feature_counts.csv" | tee -a ${config_directory}/0_nextflow_logs/feature_counts.log
     rm -r "${config_directory}/temp_feature_counts_dir"
 
     if [ "\$?" -ne 0 ]; then
@@ -407,6 +408,7 @@ process generate_qualimap_reports {
     val config_directory
     val reference_gtf
     val is_paired_end
+    val num_threads
     val filtered_files
 
     output:
@@ -432,8 +434,8 @@ process generate_qualimap_reports {
     echo "  Paired-end: ${is_paired_end}" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
     echo "  Filtered BAM files: ${filtered_files}" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
 
-    echo "bash "${config_directory}/generate_qualimap_report.sh" "${config_directory}" "${reference_gtf}" "${is_paired_end}"" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
-    bash "${config_directory}/generate_qualimap_report.sh" "${config_directory}" "${reference_gtf}" "${is_paired_end}" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
+    echo "bash "${config_directory}/generate_qualimap_report.sh" "${config_directory}" "${num_threads}" "${reference_gtf}" "${is_paired_end}"" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
+    bash "${config_directory}/generate_qualimap_report.sh" "${config_directory}" "${num_threads}" "${reference_gtf}" "${is_paired_end}" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
     
     if [ "\$?" -ne 0 ]; then
         echo "[ERROR] Qualimap report generation failed" | tee -a ${config_directory}/0_nextflow_logs/qualimap_report.log
@@ -580,13 +582,13 @@ workflow {
         // Generate Qualimap reports
         log.info "Running Qualimap for quality control"
         println "Generating qualimap reports for filtered BAM files: ${config_directory}/3_1_qualimap_filter_output_qc"
-        qualimap_files = generate_qualimap_reports(config_directory, reference_gtf, is_paired_end, filtered_files.filtered_files)
+        qualimap_files = generate_qualimap_reports(config_directory, reference_gtf, is_paired_end, fastqc_cores, filtered_files.filtered_files)
 
         // Generating stringtie and raw-counts 
         log.info "Running StringTie and Raw Counts Generation"
         println "Generating StringTie and raw counts in: ${config_directory}/4_stringtie_counts_output and ${config_directory}/5_raw_counts_output"
         stringtie_files = generate_stringtie_counts(config_directory, fastqc_cores, reference_gtf, strand_st, species, filtered_files.filtered_files)
-        feature_count_files = generate_feature_counts(config_directory, reference_gtf, is_paired_end, filtered_files.filtered_files)
+        feature_count_files = generate_feature_counts(config_directory, fastqc_cores, reference_gtf, is_paired_end, filtered_files.filtered_files)
         raw_count_files = generate_raw_counts(config_directory, reference_gtf, is_paired_end, strand_hts, paired_hts, species, feature_count_files.feature_counts_files)  
 
         // Generate Stats
@@ -596,4 +598,3 @@ workflow {
 
     }
 }
-

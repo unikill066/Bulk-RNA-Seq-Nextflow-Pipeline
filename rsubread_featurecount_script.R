@@ -3,8 +3,8 @@ library(Rsubread)
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 4) {
-    cat("Usage: Rscript featureCounts_script.R <bamFilesDirectory> <gtfFile> <isPairedEnd> <outputCSV>\n")
+if (length(args) != 5) {
+    cat("Usage: Rscript featureCounts_script.R <bamFilesDirectory> <gtfFile> <isPairedEnd> <numThreads> <outputCSV>\n")
     quit(status = 1)
 }
 
@@ -13,7 +13,8 @@ if (length(args) != 4) {
 filepath <- args[1]
 gtfFile <- args[2]
 isPairedEnd <- as.logical(args[3])
-outputCSV <- args[4]
+numThreads <- as.numeric(args[4])
+outputCSV <- args[5]
 
 
 
@@ -34,7 +35,7 @@ if (length(filenames) == 0) {
 featurecounts <- featureCounts(files = filenames, 
                                annot.ext = gtfFile, 
                                isGTFAnnotationFile = TRUE, 
-                               nthreads = 60, 
+                               nthreads = numThreads, 
                                isPairedEnd = isPairedEnd, 
                                countReadPairs = TRUE)
 

@@ -15,16 +15,17 @@ log() {
 }
 
 usage() {
-    log "Usage: $0 <CONFIG_DIRECTORY> <REFERENCE_GTF> <PAIRED_END (true/false)>"
+    log "Usage: $0 <CONFIG_DIRECTORY> <NUM_THREADS> <REFERENCE_GTF> <PAIRED_END (true/false)>"
     exit 1
 }
 
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 4 ]; then
     usage
 fi
 
 config_directory=$1
-ref_genome_file=$2
+num_threads=$2
+ref_genome_file=$3
 paired_end=$3
 
 memory_size="10G"
@@ -62,12 +63,13 @@ if [ -d "${filter_output_fpath}" ]; then
         
         if [ "$paired_end" = true ]; then
             log "Running Qualimap for paired-end data"
-            log "qualimap rnaseq -pe -bam $file -outdir $qualimap_output_fpath -gtf $ref_genome_file --java-mem-size=$memory_size"
-            qualimap rnaseq -pe -bam "$file" -outdir "$qualimap_output_fpath" -gtf "$ref_genome_file" --java-mem-size="$memory_size"
+            log "qualimap rnaseq -pe -bam $file -outdir $qualimap_output_fpath -nt $num_threads -gtf $ref_genome_file --java-mem-size=$memory_size"
+            qualimap rnaseq -pe -bam "$file" -outdir "$qualimap_output_fpath" -nt "$num_threads" -gtf "$ref_genome_file" --java-mem-size="$memory_size"
+            # stackoverflow.com/questions/45964751/python3-opencv-cv2-error-215-unable-to-show-captured-image (-nt threads (8) documentation)
         else
             log "Running Qualimap for single-end data"
-            log "qualimap rnaseq -bam $file -outdir $qualimap_output_fpath -gtf $ref_genome_file --java-mem-size=$memory_size"
-            qualimap rnaseq -bam "$file" -outdir "$qualimap_output_fpath" -gtf "$ref_genome_file" --java-mem-size="$memory_size"
+            log "qualimap rnaseq -bam $file -outdir $qualimap_output_fpath -nt $num_threads -gtf $ref_genome_file --java-mem-size=$memory_size"
+            qualimap rnaseq -bam "$file" -outdir "$qualimap_output_fpath" -nt "$num_threads" -gtf "$ref_genome_file" --java-mem-size="$memory_size"
         fi
         log " "
     done

@@ -64,8 +64,8 @@ for mapped_bam_file in "${map_output_fpath}"/*.bam; do
 
         # Indexing the deduplicated sample
         log "Indexing ${filter_output_fpath}/${sample}.dedup.bam"
-        log "Command: samtools index ${filter_output_fpath}/${sample}.dedup.bam"
-        samtools index "${filter_output_fpath}/${sample}.dedup.bam" 2> "${filter_log_fpath}/${sample}_dedupindexing_step.log"
+        log "Command: samtools index -@ ${num_threads} ${filter_output_fpath}/${sample}.dedup.bam"
+        samtools index -@ ${num_threads} "${filter_output_fpath}/${sample}.dedup.bam" 2> "${filter_log_fpath}/${sample}_dedupindexing_step.log"
 
         # Filtering based on the presence of BED files
         log "Filtering ${sample}.dedup.bam"
@@ -85,8 +85,8 @@ for mapped_bam_file in "${map_output_fpath}"/*.bam; do
 
         # Indexing the filtered sample
         log "Indexing ${filter_output_fpath}/${sample}.filt.bam"
-        log "Command: samtools index ${filter_output_fpath}/${sample}.filt.bam"
-        samtools index "${filter_output_fpath}/${sample}.filt.bam" 2> "${filter_log_fpath}/${sample}_filtindexing_step.log"
+        log "Command: samtools index -@ ${num_threads} ${filter_output_fpath}/${sample}.filt.bam"
+        samtools index -@ ${num_threads} "${filter_output_fpath}/${sample}.filt.bam" 2> "${filter_log_fpath}/${sample}_filtindexing_step.log"
     else
         log "No file ${mapped_bam_file} found in ${map_output_fpath}"
     fi

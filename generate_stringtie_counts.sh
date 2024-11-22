@@ -50,6 +50,8 @@ for filtered_file in "${filter_output_fpath}"/*.filt.bam; do
         log "Running stringtie: ${filtered_file}"
         log "( stringtie -p ${num_threads} -e -v -G ${reference_gtf} ${strand_st} ${filtered_file} -o ${counts_output_fpath}/${libr_name}.assemb.gtf -A ${counts_output_fpath}/${libr_name}.tab ) 2> ${counts_log_fpath}/${libr_name}_stringtie_step.log"
         ( stringtie -p ${num_threads} -e -v -G ${reference_gtf} ${strand_st} ${filtered_file} -o ${counts_output_fpath}/${libr_name}.assemb.gtf -A ${counts_output_fpath}/${libr_name}.tab ) 2> ${counts_log_fpath}/${libr_name}_stringtie_step.log
+        # https://ccb.jhu.edu/software/stringtie/index.shtml?t=manual
+        # -p <int>	Specify the number of processing threads (CPUs) to use for transcript assembly. The default is 1.
     else
         log "No ${filtered_file}.filt.bam file found in $filter_output_fpath"
     fi
