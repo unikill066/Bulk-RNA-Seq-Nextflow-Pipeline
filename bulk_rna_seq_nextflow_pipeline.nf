@@ -12,15 +12,15 @@
 
 
 println "Bulk RNA-seq Pipeline"
-println "  "
-println "Here are the steps involved in the Bulk RNA-seq Analysis:"
+println " "
+println "Steps involved in the Bulk RNA-seq Analysis:"
 println "1. Quality Control - Generate FastQC and MultiQC reports"
 println "2. Genome Alignment - Map reads to the reference genome using STAR"
-println "2_1. Mapping Metrics - Generate mapping statistics and quality reports"
+println "2.1. Mapping Metrics - Generate mapping statistics and quality reports"
 println "3. Post-Alignment Processing - Filter, deduplicate, and index aligned reads"
-println "3_1. Quality Assessment - Generate Qualimap reports for aligned reads"
+println "3.1. Quality Assessment - Generate Qualimap reports for aligned reads"
 println "4. Transcript Assembly and Quantification - Generate counts using StringTie"
-println "5. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts"
+println "5. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts"
 
 
 process generate_fastqc_multiqc_reports {
@@ -59,7 +59,7 @@ process generate_fastqc_multiqc_reports {
 
 
 process star_mapping {
-    // Process to perform STAR alignment for RNA-seq data
+    // Process to perform STAR alignment for RNA-seq data with dynamic file format support
     debug true
     errorStrategy 'terminate'
     
@@ -74,75 +74,129 @@ process star_mapping {
     val clip5_num
     val clip3_num
     val index_path
-
+    val file_extension  // New parameter for file extension (e.g., "fastq.gz", "fastq", "fq", "fa", "fasta")
+    
     output:
     val "${config_directory}/2_star_mapping_output", emit: mapped_files
-
+    
     script:
     def map_output_fpath = "${config_directory}/2_star_mapping_output"
     def map_log_fpath = "${map_output_fpath}/log"
-
+    
     """
     mkdir -p "${config_directory}/0_nextflow_logs"
     echo "[INFO] Starting STAR mapping at \$(date)" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
-
+    echo "[INFO] Working with file extension: ${file_extension}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+    
+    # Validate input files and directories
     if [ ! -f "${samples_file}" ]; then
         echo "[ERROR] Samples file not found: ${samples_file}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
         exit 1
     fi
-
     if [ ! -d "${fastq_files}" ]; then
         echo "[ERROR] FASTQ files directory not found: ${fastq_files}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
         exit 1
     fi
-
     if [ ! -d "${index_path}" ]; then
         echo "[ERROR] STAR index directory not found: ${index_path}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
         exit 1
     fi
-
+    
     mkdir -p ${map_output_fpath} ${map_log_fpath}
-
+    
+    # Determine readFilesCommand based on file extension
+    case "${file_extension}" in
+        *.gz)
+            READ_FILES_CMD="zcat"
+            echo "[INFO] Using zcat for compressed files (.gz)" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+            ;;
+        *.bz2)
+            READ_FILES_CMD="bzcat"
+            echo "[INFO] Using bzcat for bzip2 compressed files (.bz2)" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+            ;;
+        *.xz)
+            READ_FILES_CMD="xzcat"
+            echo "[INFO] Using xzcat for xz compressed files (.xz)" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+            ;;
+        *)
+            READ_FILES_CMD="cat"
+            echo "[INFO] Using cat for uncompressed files" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+            ;;
+    esac
+    
+    # Process each sample
     for sample_name in \$(cat ${samples_file})
     do
-        echo "Running STAR for sample: \$sample_name"
-
+        echo "[INFO] Running STAR for sample: \$sample_name" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+        
+        # Check if sample files exist before processing
         if [ "${is_paired_end}" = true ]; then
+            read1_file="${fastq_files}/\${sample_name}${read1_suffix}.${file_extension}"
+            read2_file="${fastq_files}/\${sample_name}${read2_suffix}.${file_extension}"
+            
+            if [ ! -f "\$read1_file" ]; then
+                echo "[ERROR] Read 1 file not found: \$read1_file" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+                exit 1
+            fi
+            if [ ! -f "\$read2_file" ]; then
+                echo "[ERROR] Read 2 file not found: \$read2_file" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+                exit 1
+            fi
+            
+            # Paired-end STAR command
             star_cmd="STAR --runThreadN ${num_threads} \\
                       --runMode alignReads \\
                       --genomeDir ${index_path} \\
-                      --readFilesIn ${fastq_files}/\${sample_name}${read1_suffix}.fastq.gz ${fastq_files}/\${sample_name}${read2_suffix}.fastq.gz \\
-                      --readFilesCommand zcat \\
+                      --readFilesIn \$read1_file \$read2_file \\
+                      --readFilesCommand \$READ_FILES_CMD \\
                       --clip5pNbases ${clip5_num} ${clip5_num} \\
                       --clip3pNbases ${clip3_num} ${clip3_num} \\
                       --outFileNamePrefix ${map_output_fpath}/\${sample_name} \\
-                      --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts 2> ${map_log_fpath}/\${sample_name}_mapping_step.log"
-            echo "Executing STAR command: \${star_cmd}"
-            eval \${star_cmd}
+                      --outSAMtype BAM SortedByCoordinate \\
+                      --quantMode GeneCounts"
         else
+            read1_file="${fastq_files}/\${sample_name}${read1_suffix}.${file_extension}"
+            
+            if [ ! -f "\$read1_file" ]; then
+                echo "[ERROR] Read file not found: \$read1_file" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+                exit 1
+            fi
+            
+            # Single-end STAR command  
             star_cmd="STAR --runThreadN ${num_threads} \\
                       --runMode alignReads \\
                       --genomeDir ${index_path} \\
-                      --readFilesIn ${fastq_files}/\${sample_name}${read1_suffix}.fastq.gz \\
-                      --readFilesCommand zcat \\
+                      --readFilesIn \$read1_file \\
+                      --readFilesCommand \$READ_FILES_CMD \\
                       --clip5pNbases ${clip5_num} \\
                       --clip3pNbases ${clip3_num} \\
                       --outFileNamePrefix ${map_output_fpath}/\${sample_name} \\
-                      --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts 2> ${map_log_fpath}/\${sample_name}_mapping_step.log"
-            echo "Executing STAR command: \${star_cmd}" | tee -a ${config_directory}/\${sample_name}_mapping_step.log
-            eval \${star_cmd}
+                      --outSAMtype BAM SortedByCoordinate \\
+                      --quantMode GeneCounts"
         fi
-    
+        
+        echo "[INFO] Executing STAR command: \${star_cmd}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+        eval \${star_cmd} 2> ${map_log_fpath}/\${sample_name}_mapping_step.log
+        
         if [ "\$?" -ne 0 ]; then
             echo "[ERROR] STAR mapping failed for sample: \${sample_name}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
             exit 1
         fi
-
+        
+        # Index the BAM file
+        echo "[INFO] Indexing BAM file for sample: \${sample_name}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
         index_cmd="samtools index ${map_output_fpath}/\${sample_name}Aligned.sortedByCoord.out.bam"
-        echo "Executing samtools index command: \${index_cmd}" tee -a ${config_directory}/\${sample_name}_mapping_step.log
+        echo "[INFO] Executing samtools index command: \${index_cmd}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
         eval \${index_cmd}
+        
+        if [ "\$?" -ne 0 ]; then
+            echo "[ERROR] BAM indexing failed for sample: \${sample_name}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
+            exit 1
+        fi
+        
+        echo "[INFO] Successfully processed sample: \${sample_name}" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
     done
-
+    
     echo "[INFO] STAR mapping process completed at \$(date)" | tee -a ${config_directory}/0_nextflow_logs/star_mapping.log
     """
 }
@@ -488,6 +542,46 @@ process generate_stats {
 }
 
 
+process infer_strandedness {
+    debug true
+    errorStrategy 'terminate'
+
+    input:
+    val config_directory
+    val threshold
+
+    output:
+    tuple val("sample"), val("strandedness_call"), emit: strand_calls
+
+    script:
+    """
+    mkdir -p "${config_directory}/0_nextflow_logs"
+    mkdir -p "${config_directory}/stranded_calls"
+    echo "[INFO] Starting strandedness inference at \$(date)" | tee -a ${config_directory}/0_nextflow_logs/infer_strandedness.log
+    
+    # Process all ReadsPerGene.out.tab files
+    for rpg_file in ${config_directory}/2_star_mapping_output/*ReadsPerGene.out.tab
+    do
+        if [ -f "\$rpg_file" ]; then
+            sample_name=\$(basename "\$rpg_file" | sed 's/ReadsPerGene.out.tab//')
+            echo "[INFO] Processing sample: \$sample_name" | tee -a ${config_directory}/0_nextflow_logs/infer_strandedness.log
+            
+            call=\$(python ${config_directory}/infer_strandedness.py "\$rpg_file" -t ${threshold} \\
+                    | tail -n1 \\
+                    | cut -f2)
+            
+            echo -e "\${sample_name}\\t\${call}" > ${config_directory}/stranded_calls/\${sample_name}_calls.tsv
+            echo "[INFO] Sample \$sample_name: \$call" | tee -a ${config_directory}/0_nextflow_logs/infer_strandedness.log
+        fi
+    done
+    
+    # Combine all calls into a single file
+    cat ${config_directory}/stranded_calls/*_calls.tsv > ${config_directory}/stranded_calls/all_calls.tsv
+    echo "[INFO] Strandedness inference completed at \$(date)" | tee -a ${config_directory}/0_nextflow_logs/infer_strandedness.log
+    """
+}
+
+
 workflow {
 
     // input parameters
@@ -498,6 +592,7 @@ workflow {
     is_paired_end = params.paired_end
     read1_suffix = params.read1_suffix
     read2_suffix = params.read2_suffix
+    file_extension = params.file_extension ?: "fastq.gz"
     // star variables
     clip5_num = params.clip5_num
     clip3_num = params.clip3_num ?: 0
@@ -507,16 +602,17 @@ workflow {
     exclude_bed_file = params.exclude_bed_file_path
     // reference file and variables used for stringtie / raw-counts 
     reference_gtf = params.reference_gtf
-    strand_st = params.strand_st
-    strand_hts = params.strand_hts
+    // strand_st = params.strand_st
+    // strand_hts = params.strand_hts
     paired_hts = params.paired_hts
-
+    threshold = params.threshold ?: 0.8
     species = params.species
     
     // logging
     log.info " "
     log.info "Config directory: ${config_directory}"
     log.info "Fastq files directory: ${fastq_files}"
+    log.info "File extension: ${file_extension}"
     log.info " "
 
     // Assertions to ensure that critical parameters are set
@@ -526,6 +622,7 @@ workflow {
     assert fastqc_cores != null : "ERROR: 'fastqc_cores' must be defined!"
     assert is_paired_end != null : "ERROR: 'is_paired_end' must be defined!"
     assert read1_suffix != null : "ERROR: 'read1_suffix' must be defined!"
+    assert file_extension != null : "ERROR: 'file_extension' must be defined!"
 
     // Running FastQC and MultiQC Reports
     if (params.run_fastqc) {
@@ -541,60 +638,99 @@ workflow {
         assert clip3_num != null : "ERROR: 'clip3_num' must be defined!"
         assert index_path != null : "ERROR: 'index_path' must be defined!"
         assert reference_gtf != null : "ERROR: 'reference_gtf' must be defined!"
-        assert strand_st != null : "ERROR: 'strand_st' must be defined!"
-        assert strand_hts != null : "ERROR: 'strand_hts' must be defined!"
         assert paired_hts != null : "ERROR: 'paired_hts' must be defined!"
+        assert file_extension != null : "ERROR: 'file_extension' must be defined!"
+        assert threshold != null : "ERROR: 'threshold' must be defined!"
     }
 
     // Running STAR Mapping
     if (params.run_rna_pipeline) {
-        // assert params.is_paired_end != null : "is_paired_end is required!"
-        // assert params.read1_suffix != null : "read1_suffix is required!"
-        // read2_suffix = params.read2_suffix ?: ""
-        // assert params.clip5_num != null : "clip5_num is required!"
-        // assert params.clip3_num != null : "clip3_num is required!"
-        // assert params.index_path != null : "index_path is required!"
-
         log.info "Running STAR Mapping"
         println "STAR mapping output directory: ${config_directory}/2_star_mapping_output"
         mapped_files = star_mapping(
             config_directory, samples_file, fastq_files, is_paired_end, read1_suffix, read2_suffix, 
-            fastqc_cores, clip5_num, clip3_num, index_path
+            fastqc_cores, clip5_num, clip3_num, index_path, file_extension
         )
 
         // generating mapping metrics
         log.info "Generating Mapping Metrics"
         map_metric_files = generate_mapping_metrics(config_directory, mapped_files.mapped_files)
         
+        // inferring strandedness
+        log.info "Inferring strandedness"
+        mapped_files.mapped_files.map { mapping_dir ->
+            // 1) pick one ReadsPerGene file
+            def rpg = file("${config_directory}/2_star_mapping_output/*ReadsPerGene.out.tab")[0]
+            // 2) run the Python inference
+            def call = "python ${config_directory}/infer_strandedness.py ${rpg} -t ${threshold}".execute().text.trim().split('\n')[-1].split('\t')[1]
+            // 3) map to StringTie / HTSeq flags
+            def strand_st_dynamic = (call=='second' ? '--fr' :
+                              call=='first'  ? '--rf' : '')
+            def strand_hts_dynamic = (call=='second' ? 'yes'  :
+                              call=='first'  ? 'reverse' : 'no')
+            
+            log.info "Detected strandedness: ${call}"
+            log.info "StringTie flag: ${strand_st_dynamic}"
+            log.info "HTSeq flag: ${strand_hts_dynamic}"
+            
+            return tuple(mapping_dir, strand_st_dynamic, strand_hts_dynamic)
+        }.set { mapping_with_strand }
+
         // Filtering, deduplication and indexing
         log.info "Running Filtering and Deduplication"
         println "Filtering, deduplication and sorting output directory: ${config_directory}/3_filter_output"
         filtered_files = filter_samples(config_directory, fastqc_cores, blist_bed_file, exclude_bed_file, mapped_files.mapped_files)
 
-        // executes rest of the steps right after filtering
-        // filtered_files.branch {
-        //     stringtie: true
-        //     rawcounts: true
-        //     featurecounts: true
-        //     qualimap: true
-        // }.set { branched_filtered_files }
+        // Use the dynamically determined strand parameters
+        mapping_with_strand.map { mapping_dir, strand_st_val, strand_hts_val ->
+            // Generating stringtie and raw-counts with dynamic strand parameters
+            log.info "Running StringTie and Raw Counts Generation with dynamic strand parameters"
+            log.info "StringTie strand parameter: ${strand_st_val}"
+            log.info "HTSeq strand parameter: ${strand_hts_val}"
+            
+            println "Generating StringTie and raw counts in: ${config_directory}/4_stringtie_counts_output and ${config_directory}/5_raw_counts_output"
+            stringtie_files = generate_stringtie_counts(config_directory, fastqc_cores, reference_gtf, strand_st_val, species, filtered_files.filtered_files)
+            feature_count_files = generate_feature_counts(config_directory, fastqc_cores, reference_gtf, is_paired_end, filtered_files.filtered_files)
+            raw_count_files = generate_raw_counts(config_directory, reference_gtf, is_paired_end, strand_hts_val, paired_hts, species, feature_count_files.feature_counts_files)  
+
+            // Generate Stats
+            log.info "Generating Pipeline Stats"
+            println "Generating Stats for the current run: ${config_directory}/6_pipeline_stats_<TIMESTAMP>.log"
+            generate_stats(config_directory, fastq_files, is_paired_end, clip5_num, clip3_num, feature_count_files.feature_counts_files)
+            
+            return tuple(stringtie_files, feature_count_files, raw_count_files)
+        }
+
+        // backup
+        // // Filtering, deduplication and indexing
+        // log.info "Running Filtering and Deduplication"
+        // println "Filtering, deduplication and sorting output directory: ${config_directory}/3_filter_output"
+        // filtered_files = filter_samples(config_directory, fastqc_cores, blist_bed_file, exclude_bed_file, mapped_files.mapped_files)
+
+        // // executes rest of the steps right after filtering
+        // // filtered_files.branch {
+        // //     stringtie: true
+        // //     rawcounts: true
+        // //     featurecounts: true
+        // //     qualimap: true
+        // // }.set { branched_filtered_files }
         
-        // Generate Qualimap reports
-        log.info "Running Qualimap for quality control"
-        println "Generating qualimap reports for filtered BAM files: ${config_directory}/3_1_qualimap_filter_output_qc"
-        qualimap_files = generate_qualimap_reports(config_directory, reference_gtf, is_paired_end, fastqc_cores, filtered_files.filtered_files)
+        // // Generate Qualimap reports
+        // // log.info "Running Qualimap for quality control"
+        // // println "Generating qualimap reports for filtered BAM files: ${config_directory}/3_1_qualimap_filter_output_qc"
+        // // qualimap_files = generate_qualimap_reports(config_directory, reference_gtf, is_paired_end, fastqc_cores, filtered_files.filtered_files)
 
-        // Generating stringtie and raw-counts 
-        log.info "Running StringTie and Raw Counts Generation"
-        println "Generating StringTie and raw counts in: ${config_directory}/4_stringtie_counts_output and ${config_directory}/5_raw_counts_output"
-        stringtie_files = generate_stringtie_counts(config_directory, fastqc_cores, reference_gtf, strand_st, species, filtered_files.filtered_files)
-        feature_count_files = generate_feature_counts(config_directory, fastqc_cores, reference_gtf, is_paired_end, filtered_files.filtered_files)
-        raw_count_files = generate_raw_counts(config_directory, reference_gtf, is_paired_end, strand_hts, paired_hts, species, feature_count_files.feature_counts_files)  
+        // // Generating stringtie and raw-counts 
+        // log.info "Running StringTie and Raw Counts Generation"
+        // println "Generating StringTie and raw counts in: ${config_directory}/4_stringtie_counts_output and ${config_directory}/5_raw_counts_output"
+        // stringtie_files = generate_stringtie_counts(config_directory, fastqc_cores, reference_gtf, strand_st, species, filtered_files.filtered_files)
+        // feature_count_files = generate_feature_counts(config_directory, fastqc_cores, reference_gtf, is_paired_end, filtered_files.filtered_files)
+        // raw_count_files = generate_raw_counts(config_directory, reference_gtf, is_paired_end, strand_hts, paired_hts, species, feature_count_files.feature_counts_files)  
 
-        // Generate Stats
-        log.info "Generating Pipeline Stats"
-        println "Generating Stats for the current run: ${config_directory}/6_pipeline_stats_<TIMESTAMP>.log"
-        generate_stats(config_directory, fastq_files, is_paired_end, clip5_num, clip3_num, feature_count_files.feature_counts_files)
+        // // Generate Stats
+        // log.info "Generating Pipeline Stats"
+        // println "Generating Stats for the current run: ${config_directory}/6_pipeline_stats_<TIMESTAMP>.log"
+        // generate_stats(config_directory, fastq_files, is_paired_end, clip5_num, clip3_num, feature_count_files.feature_counts_files)
 
     }
 }
