@@ -685,8 +685,19 @@ workflow {
         mapping_with_strand.map { mapping_dir, strand_st_val, strand_hts_val ->
             // Generating stringtie and raw-counts with dynamic strand parameters
             log.info "Running StringTie and Raw Counts Generation with dynamic strand parameters"
+            def strand_st_val  = (call == 'second') ? '--fr'
+                          : (call == 'first')  ? '--rf'
+                                               : params.strand_st
+            def strand_hts_val = (call == 'second') ? 'yes'
+                          : (call == 'first')  ? 'reverse'
+                                               : params.strand_hts
             log.info "StringTie strand parameter: ${strand_st_val}"
             log.info "HTSeq strand parameter: ${strand_hts_val}"
+
+            // Generate Qualimap reports
+            // log.info "Running Qualimap for quality control"
+            // println "Generating qualimap reports for filtered BAM files: ${config_directory}/3_1_qualimap_filter_output_qc"
+            // qualimap_files = generate_qualimap_reports(config_directory, reference_gtf, is_paired_end, fastqc_cores, filtered_files.filtered_files)
             
             println "Generating StringTie and raw counts in: ${config_directory}/4_stringtie_counts_output and ${config_directory}/5_raw_counts_output"
             stringtie_files = generate_stringtie_counts(config_directory, fastqc_cores, reference_gtf, strand_st_val, species, filtered_files.filtered_files)
